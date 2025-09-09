@@ -43,7 +43,11 @@ inline void WAIT_US(uint32_t us)    { esp_rom_delay_us(us); }
 class Mutex {
 public:
     Mutex() {
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        _sem = xSemaphoreCreateMutex();
+        #else
         _sem = xSemaphoreCreateMutexStatic(&_semBuf);
+        #endif
         configASSERT(_sem);
     }
     ~Mutex() {
@@ -76,8 +80,11 @@ public:
     }
 
 private:
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     StaticSemaphore_t _semBuf;
+    #else
     SemaphoreHandle_t _sem; // Handle to the mutex
+    #endif
 };
 
 
