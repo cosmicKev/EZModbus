@@ -47,14 +47,17 @@ RTU::Result RTU::begin() {
     if (!_rxEventQueue) {
         return Error(ERR_INIT_FAILED, "UART HAL not ready or void UART event queue");
     }
-
-    // Create TX request queue
+// Create TX request queue
+#if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _txRequestQueue = xQueueCreateStatic(1, sizeof(void*), _txRequestQueueStorage, &_txRequestQueueBuffer);
+#else
+    _txRequestQueue = xQueueCreate(1, sizeof(void*));
+#endif
+
     if (!_txRequestQueue) {
         _rxEventQueue = nullptr;
         return Error(ERR_INIT_FAILED, "failed to create TX request queue");
-    }
-
+    }       
     // Create event queue set (combines rxEventQueue + uartEventQueue)
     _eventQueueSet = xQueueCreateSet(_uartHAL.DRIVER_EVENT_QUEUE_SIZE + 1); // +1 for txRequestQueue (flag)
     if (!_eventQueueSet) {
@@ -83,6 +86,9 @@ RTU::Result RTU::begin() {
 
     _isInitialized = true; // Needed for the task not to terminate prematurely
 
+#if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+#warning "EZMODBUS_USE_EXTERNAL_TASK is not defined, using internal task"
+
     // Create the RX/TX task
     _rxTxTaskHandle = xTaskCreateStatic(
         /*pxTaskCode*/      rxTxTask,
@@ -93,14 +99,18 @@ RTU::Result RTU::begin() {
         /*puxStackBuffer*/  _rxTxTaskStack,
         /*xTaskBuffer*/     &_rxTxTaskBuffer
     );
-
     // Cleanup resources if task creation failed
     if (!_rxTxTaskHandle) {
         _isInitialized = false;
         beginCleanup();
         return Error(ERR_INIT_FAILED, "failed to create rxTxTask");
     }
-    
+#else
+    Modbus::Debug::LOG_MSGF("EZMODBUS_USE_EXTERNAL_TASK is defined, using external task");
+
+
+#endif
+
     // Configure UART idle detection (silence time)
     Result resIdleCfg = ERR_CONFIG_FAILED;
     if (_silenceTimeUs > 0) {
