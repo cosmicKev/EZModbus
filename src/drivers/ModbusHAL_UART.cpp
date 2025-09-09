@@ -25,6 +25,8 @@ UART::UART(uart_port_t uart_num,
       _pin_rx(pin_rx),
       _pin_tx(pin_tx),
       _is_driver_installed(false) {
+        memset(&_current_hw_config, 0, sizeof(_current_hw_config));
+
         // Initialize _current_hw_config with the provided parameters
         decode_config_flags(_config_flags, _current_hw_config.data_bits, _current_hw_config.parity, _current_hw_config.stop_bits);
         _current_hw_config.baud_rate = _baud_rate;
@@ -34,6 +36,7 @@ UART::UART(uart_port_t uart_num,
         #else
             _current_hw_config.source_clk = UART_SCLK_APB;
         #endif
+        _current_hw_config.rx_flow_ctrl_thresh = 2;
         Modbus::Debug::LOG_MSGF("Constructor for port %d", _uart_num);
 }
 
