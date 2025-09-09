@@ -171,7 +171,7 @@ public:
         if (!initialized) return; // Consider empty if not initialized
         
         // Wait for the queue to be empty
-        EventBits_t bits = xEventGroupWaitBits(
+        xEventGroupWaitBits(
             queueEventGroup,
             QUEUE_EMPTY_BIT,
             pdFALSE,  // Don't clear the bit
