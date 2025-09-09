@@ -87,6 +87,7 @@ public:
     Result sendFrame(const Modbus::Frame& frame, TxResultCallback txCallback, void* ctx) override;
     bool isReady() override;
     TaskHandle_t getRxTxTaskHandle();
+    static void rxTxTask(void* rtu);
 
 private:
     // ===================================================================================
@@ -113,8 +114,10 @@ private:
     QueueHandle_t _rxEventQueue = nullptr;
     // _txRequestQueue: just a dummy signaling queue so that we can use xQueueSet 
     // to wait for both RX and TX without wasting CPU
+    #ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
     StaticQueue_t _txRequestQueueBuffer;
     alignas(4) uint8_t _txRequestQueueStorage[1 * sizeof(void*)];
+    #endif
     QueueHandle_t _txRequestQueue = nullptr; 
     // _eventQueueSet: Combines RX event queue + UART event queue
     QueueSetHandle_t _eventQueueSet = nullptr;
@@ -140,9 +143,10 @@ private:
     // TASKS
     // ===================================================================================
 
-    static void rxTxTask(void* rtu);
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
     StaticTask_t _rxTxTaskBuffer;
     StackType_t _rxTxTaskStack[RXTX_TASK_STACK_SIZE];
+    #endif
     TaskHandle_t _rxTxTaskHandle = nullptr;
 
     // ===================================================================================
