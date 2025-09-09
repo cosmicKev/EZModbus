@@ -1,0 +1,24 @@
+menu "EzModbus"
+    config EZMODBUS_USE_DYNAMIC_MEMORY
+        bool "Use dynamic memory for EZModbus"
+        default n
+        help
+            Use dynamic memory for EZModbus
+            If enabled, the EZModbus will use dynamic memory allocation for FreeRTOS queue, semaphores, mutex, timers.
+            Note: Tasks need to be created externally if enabled. This allows a more fine-grained control over the memory allocation.
+
+    config EZMODBUS_USE_EXTERNAL_TASK
+        bool "User is responsible for creating the tasks externally and managing their memory allocation."
+        default n
+        help
+            Use external tasks for EZModbus
+            If enabled, the EZModbus will use external tasks   
+             
+    config EZMODBUS_DEBUG
+        bool "Enable EZModbus debug"
+        default n
+        help
+            Enable EZModbus debug
+            If enabled, the EZModbus will use debug features
+            Default is disabled
+endmenu
