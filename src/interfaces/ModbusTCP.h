@@ -91,6 +91,7 @@ public:
     bool isReady() override;
     void abortCurrentTransaction() override;
     TaskHandle_t getRxTxTaskHandle();
+    static void rxTxTask(void* tcp);
 
 private:
     // ===================================================================================
@@ -117,8 +118,10 @@ private:
     QueueHandle_t _rxEventQueue = nullptr;
     // _txRequestQueue: just a dummy signaling queue so that we can use xQueueSet 
     // to wait for both RX and TX without wasting CPU
+    #ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
     StaticQueue_t _txRequestQueueBuffer;
     alignas(4) uint8_t _txRequestQueueStorage[1 * sizeof(void*)];
+    #endif
     QueueHandle_t _txRequestQueue = nullptr;
     // _txnControlQueue: only rxTxTask terminates transaction through this queue
     StaticQueue_t _txnControlQueueBuffer;
@@ -152,9 +155,10 @@ private:
     // TASKS
     // ===================================================================================
 
-    static void rxTxTask(void* tcp);
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
     StaticTask_t _rxTxTaskBuffer;
     StackType_t _rxTxTaskStack[RXTX_TASK_STACK_SIZE];
+    #endif
     TaskHandle_t _rxTxTaskHandle;
 
 };

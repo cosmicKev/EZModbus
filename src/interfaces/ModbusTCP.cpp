@@ -29,6 +29,7 @@ TCP::TCP(ModbusHAL::TCP& hal, Modbus::Role role)
 }
 
 TCP::~TCP() {
+
     if (_isInitialized) {
         _isInitialized = false;
         killRxTxTask();
@@ -76,14 +77,22 @@ TCP::Result TCP::begin() {
     }
 
     // Create TX request queue (size 1)
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _txRequestQueue = xQueueCreateStatic(1, sizeof(void*), _txRequestQueueStorage, &_txRequestQueueBuffer);
+    #else
+    _txRequestQueue = xQueueCreate(1, sizeof(void*));
+    #endif
     if (!_txRequestQueue) {
         _rxEventQueue = nullptr;
         return Error(ERR_INIT_FAILED, "failed to create TX queue");
     }
 
     // Create Txn control queue (size 1)
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _txnControlQueue = xQueueCreateStatic(1, sizeof(void*), _txnControlQueueStorage, &_txnControlQueueBuffer);
+    #else
+    _txnControlQueue = xQueueCreate(1, sizeof(void*));
+    #endif
     if (!_txnControlQueue) {
         _rxEventQueue = nullptr;
         return Error(ERR_INIT_FAILED, "failed to create Txn control queue");
@@ -117,6 +126,7 @@ TCP::Result TCP::begin() {
 
     _isInitialized = true; // Needed for the task not to terminate prematurely
 
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
     // Create the RX/TX task
     _rxTxTaskHandle = xTaskCreateStatic(
         /*pxTaskCode*/      rxTxTask,
@@ -134,9 +144,11 @@ TCP::Result TCP::begin() {
         beginCleanup();
         return Error(ERR_INIT_FAILED, "failed to create poll task");
     }
-    
+
     Modbus::Debug::LOG_MSGF("ModbusTCP Interface ready. Role: %s", (_role == Modbus::CLIENT ? "CLIENT" : "SERVER"));
-    
+    #else
+    Modbus::Debug::LOG_MSGF("EZMODBUS_USE_EXTERNAL_TASK is defined.User needs to actvate the task manually");
+    #endif
     return Success();
 }
 
@@ -154,7 +166,6 @@ TCP::Result TCP::sendFrame(const Modbus::Frame &frame, TxResultCallback txCallba
         if (txCallback) txCallback(ERR_NOT_INITIALIZED, ctx);
         return Error(ERR_NOT_INITIALIZED, "TCP interface not initialized");
     }
-
     // Update TX buffer under critical section (mutex protection)
     {
         Lock guard(_txMutex, 0); // try-lock no wait
@@ -207,7 +218,10 @@ bool TCP::isReady() {
 
     // If the transaction is active, the interface is busy ONLY for a client
     // (a server still accepts responses to pending client requests)
-    if (_role == Modbus::CLIENT && _currentTransaction.active) return false;
+    if (_role == Modbus::CLIENT && _currentTransaction.active)
+    { 
+        return false;
+    }
 
     return _tcpHAL.isReady();
 }
@@ -247,7 +261,6 @@ void TCP::beginCleanup() {
         vQueueDelete(_eventQueueSet);
         _eventQueueSet = nullptr;
     }
-    
     if (_txRequestQueue) {
         vQueueDelete(_txRequestQueue);
         _txRequestQueue = nullptr;
@@ -258,6 +271,13 @@ void TCP::beginCleanup() {
         _txnControlQueue = nullptr;
     }
     
+    // User is responsible for deleting the task
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    if (_rxTxTaskHandle) {
+        vTaskDelete(_rxTxTaskHandle);
+        _rxTxTaskHandle = nullptr;
+    }
+    #endif
     // Do not delete HAL RX queue as it belongs to _tcpHAL
 }
 
@@ -465,7 +485,6 @@ TCP::Result TCP::handleTxRequest() {
     // Access TX buffer & metadata under critical section (mutex protection)
     { 
         Lock guard(_txMutex);
-
         // Build the message to send
         const uint8_t* payload = _txBuffer.data();
         size_t len = _txBuffer.size();
@@ -561,6 +580,8 @@ void TCP::endTransaction() {
     if (_currentTransaction.active) {
         Modbus::Debug::LOG_MSGF("Transaction ended on socket: %d with TID: %d", _currentTransaction.socketNum, _currentTransaction.tid);
         _currentTransaction.clear();
+    } else {
+        Modbus::Debug::LOG_MSG("endTransaction called but not in transaction.");
     }
 }
 
