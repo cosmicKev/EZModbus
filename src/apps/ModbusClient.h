@@ -301,7 +301,9 @@ private:
         EventGroupHandle_t _waiterEventGroup = nullptr; // Event group handle for synchronous wait (sync mode)
 
         // Request timeout cleanup timer management
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
         StaticTimer_t _timerBuf;                      // Static timer buffer
+        #endif
         TimerHandle_t _timer = nullptr;               // FreeRTOS timer handle
         BinarySemaphore _timerKillSem;                // Signals timer flush completion
         std::atomic<uint32_t> _timerCbDisarmed;       // Flag to indicate whether the timer callback is disarmed
@@ -309,7 +311,6 @@ private:
         // Atomic gates for closing race protection
         std::atomic<uint32_t> _respClosing;           // Indicates whether the request is being closed via the "normal" path
         std::atomic<uint32_t> _timerClosing;          // Indicates whether the request is being closed via the "timeout callback" path
-
 
     public:
         // Constructor
@@ -370,12 +371,13 @@ private:
     PendingRequest _pendingRequest;
     Modbus::Frame _responseBuffer;
     bool _isInitialized = false;
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     StaticEventGroup_t _waiterEventGroupBuf; // Event group buffer for synchronous wait (sync mode)
+    #endif
 
     // Helper methods members
     Modbus::Frame _helperBuffer;             // Reusable buffer for helper methods
     Mutex _helperMutex;                      // Mutex to protect helper buffer access
-
     // ===================================================================================
     // PRIVATE METHODS
     // ===================================================================================

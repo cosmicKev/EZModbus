@@ -126,6 +126,15 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Modbus::Frame* re
     // Rearm the timer callback & create timer if necessary
     rearmTimerCb();
     if (!_timer) {
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        _timer = xTimerCreate(
+            "ModbusTimeout",
+            pdMS_TO_TICKS(timeoutMs),
+            pdFALSE,
+            this,
+            timeoutCallback
+        );
+        #else
         _timer = xTimerCreateStatic(
             "ModbusTimeout",
             pdMS_TO_TICKS(timeoutMs),
@@ -134,6 +143,7 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Modbus::Frame* re
             timeoutCallback,
             &_timerBuf
         );
+        #endif
         // Check if creation succeeded, and if Start command was sent to timer Q
         if (!_timer || xTimerStart(_timer, TIMER_CMD_TOUT_TICKS) != pdTRUE) {
             _active = false;
@@ -180,6 +190,15 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Client::ResponseC
     // Rearm the timer callback & create timer if necessary
     rearmTimerCb();
     if (!_timer) {
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        _timer = xTimerCreate(
+            "ModbusTimeout",
+            pdMS_TO_TICKS(timeoutMs),
+            pdFALSE,
+            this,
+            timeoutCallback
+        );
+        #else
         _timer = xTimerCreateStatic(
             "ModbusTimeout",
             pdMS_TO_TICKS(timeoutMs),
@@ -188,6 +207,7 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Client::ResponseC
             timeoutCallback,
             &_timerBuf
         );
+        #endif
         // Check if creation succeeded, and if Start command was sent to timer Q
         if (!_timer || xTimerStart(_timer, TIMER_CMD_TOUT_TICKS) != pdTRUE) {
             _active = false;
@@ -495,7 +515,11 @@ Client::Result Client::sendRequest(const Modbus::Frame& request,
     // In sync mode, spawn the waiter event group before initializing the request
     EventGroupHandle_t syncEvtGrp = nullptr;
     if (!userTracker) {
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        syncEvtGrp = xEventGroupCreate();
+        #else
         syncEvtGrp = xEventGroupCreateStatic(&_waiterEventGroupBuf);
+        #endif
         if (!syncEvtGrp) {
             return Error(ERR_BUSY, "cannot create waiter event group");
         }
@@ -518,7 +542,6 @@ Client::Result Client::sendRequest(const Modbus::Frame& request,
 
     // ---------- Synchronous mode (userTracker == nullptr) ----------
     if (!userTracker) {
-
         // Wait for completion or timeout (response, TX error, or timeout timer)
         EventBits_t bits = xEventGroupWaitBits(
             syncEvtGrp,
