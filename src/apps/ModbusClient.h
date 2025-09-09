@@ -134,7 +134,9 @@ private:
         uint32_t _timestampMs = 0;               // Timestamp of request creation
         volatile bool _active = false;           // Whether the request is active
         Mutex _mutex;                            // Mutex to protect the pending request data
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
         StaticTimer_t _timeoutTimerBuf;          // Timer buffer for request timeout
+        #endif
         TimerHandle_t _timeoutTimer = nullptr;   // Timer handle for request timeout
         EventGroupHandle_t _syncEventGroup = nullptr; // Event group handle for synchronous wait (sync mode)
 
@@ -176,7 +178,9 @@ private:
     PendingRequest _pendingRequest;
     Modbus::Frame _responseBuffer;
     bool _isInitialized = false;
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     StaticEventGroup_t _syncEventGroupBuf; // Event group buffer for synchronous wait (sync mode)
+    #endif
     
     // ===================================================================================
     // PRIVATE METHODS

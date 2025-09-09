@@ -49,7 +49,17 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Modbus::Frame* re
     _active = true;
     
     // Create and start timeout timer
+
     if (!_timeoutTimer) {
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        _timeoutTimer = xTimerCreate(
+            "ModbusTimeout",
+            pdMS_TO_TICKS(timeoutMs),
+            pdFALSE,
+            this,
+            timeoutCallback
+        );
+        #else
         _timeoutTimer = xTimerCreateStatic(
             "ModbusTimeout",
             pdMS_TO_TICKS(timeoutMs),
@@ -58,6 +68,7 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Modbus::Frame* re
             timeoutCallback,
             &_timeoutTimerBuf
         );
+        #endif
     } else {
         // Update timer period and restart
         xTimerChangePeriod(_timeoutTimer, pdMS_TO_TICKS(timeoutMs), 0);
@@ -94,6 +105,15 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Client::ResponseC
 
     // Create / restart timeout timer
     if (!_timeoutTimer) {
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        _timeoutTimer = xTimerCreate(
+            "ModbusTimeout",
+            pdMS_TO_TICKS(timeoutMs),
+            pdFALSE,
+            this,
+            timeoutCallback
+        );
+        #else
         _timeoutTimer = xTimerCreateStatic(
             "ModbusTimeout",
             pdMS_TO_TICKS(timeoutMs),
@@ -101,6 +121,7 @@ bool Client::PendingRequest::set(const Modbus::Frame& request, Client::ResponseC
             this,
             timeoutCallback,
             &_timeoutTimerBuf);
+        #endif
     } else {
         xTimerChangePeriod(_timeoutTimer, pdMS_TO_TICKS(timeoutMs), 0);
     }
@@ -354,7 +375,11 @@ Client::Result Client::sendRequest(const Modbus::Frame& request,
     // ---------- Synchronous mode (userTracker == nullptr) ----------
     if (!userTracker) {
         // Create an event group for this synchronous transaction
+        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+        EventGroupHandle_t syncEvtGrp = xEventGroupCreate();
+        #else
         EventGroupHandle_t syncEvtGrp = xEventGroupCreateStatic(&_syncEventGroupBuf);
+        #endif
         if (!syncEvtGrp) {
             _pendingRequest.setResult(ERR_TIMEOUT, true);
             return Error(ERR_BUSY, "cannot create event group");
