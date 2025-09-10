@@ -23,14 +23,18 @@ namespace ModbusHAL {
 
 // Default constructor
 TCP::TCP()
-    : _tcpTaskHandle(nullptr),
-      _rxQueue(nullptr),
+    : _rxQueue(nullptr),
       _listenSocket(-1),
       _clientSocket(-1),
       _isServer(false),
       _isRunning(false),
       _cfgMode(CfgMode::UNINIT),
-      _cfgPort(0) {
+      _cfgPort(0) 
+{
+#if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    _tcpTaskHandle = nullptr;
+#endif
+
     _activeSocketCount = 0;
     _cfgIP[0] = '\0'; // Clear the IP string
 }
@@ -54,17 +58,20 @@ TCP::TCP(const char* serverIP, uint16_t port) : TCP() {
 }
 
 TCP::~TCP() {
+#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+    vQueueDelete(_rxQueue);
+#endif
     stop();
 }
 
 bool TCP::begin() {
     switch (_cfgMode) {
-        case CfgMode::SERVER:
-            return beginServer(_cfgPort);
-        case CfgMode::CLIENT:
-            return beginClient(_cfgIP, _cfgPort);
-        default:
-            return false; // No config
+    case CfgMode::SERVER:
+        return beginServer(_cfgPort);
+    case CfgMode::CLIENT:
+        return beginClient(_cfgIP, _cfgPort);
+    default:
+        return false; // No config
     }
 }
 
@@ -72,12 +79,14 @@ void TCP::stop() {
     Modbus::Debug::LOG_MSG("Stopping TCP HAL...");
     _isRunning = false;
 
-    if (_tcpTaskHandle) {
+#if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    if (_tcpTaskHandle)
+    {
         Modbus::Debug::LOG_MSG("Waiting for TCP task to terminate...");
         vTaskDelay(pdMS_TO_TICKS(200)); // Wait a bit for the task to self-terminate
         _tcpTaskHandle = nullptr;
     }
-
+#endif
     {
         Lock guard(_socketsMutex);
         if (_listenSocket != -1) {
@@ -279,8 +288,12 @@ bool TCP::beginServer(uint16_t port, uint32_t ip) {
         return false; // Error logged in setupServerSocket
     }
 
+#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
     _rxQueue = xQueueCreateStatic(RX_QUEUE_SIZE, sizeof(int), _rxQueueStorage, &_rxQueueBuf);
-    if (!_rxQueue) {
+#else
+    _rxQueue = xQueueCreate(RX_QUEUE_SIZE, sizeof(int));
+#endif
+    if (_rxQueue == nullptr) {
         Modbus::Debug::LOG_MSG("Failed to create RX queue.");
         stop(); // Cleanup listen socket
         return false;
@@ -288,22 +301,22 @@ bool TCP::beginServer(uint16_t port, uint32_t ip) {
     Modbus::Debug::LOG_MSG("RX queue created.");
 
     _isRunning = true;
-    _tcpTaskHandle = xTaskCreateStatic(
-        tcpTask,
-        "ModbusHALtcpSrv",
-        TCP_TASK_STACK_SIZE, // Stack size
-        this, // Task parameter
-        tskIDLE_PRIORITY + 1,    // Priority
+#if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    _tcpTaskHandle = xTaskCreateStatic(tcpTask, "ModbusHALtcpSrv",
+                                       TCP_TASK_STACK_SIZE,  // Stack size
+                                       this,                 // Task parameter
+                                       tskIDLE_PRIORITY + 1, // Priority
+                                       _tcpTaskStack, &_tcpTaskBuf);
         _tcpTaskStack,
         &_tcpTaskBuf
-    );
-
-    if (_tcpTaskHandle == nullptr) {
         Modbus::Debug::LOG_MSG("Failed to create server TCP task.");
         stop(); // Cleanup queue and socket
         return false;
     }
     Modbus::Debug::LOG_MSG("Server TCP task created and started.");
+#else
+    Modbus::Debug::LOG_MSG("User must call the runTcpTask() function to start the task.");
+#endif
     return true;
 }
 
@@ -320,24 +333,25 @@ bool TCP::beginClient(const char* serverIP, uint16_t port) {
         // Continue anyway, auto-reconnect will handle it
     }
 
+#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
     _rxQueue = xQueueCreateStatic(RX_QUEUE_SIZE, sizeof(int), _rxQueueStorage, &_rxQueueBuf);
-    if (!_rxQueue) {
+#else
+    _rxQueue = xQueueCreate(RX_QUEUE_SIZE, sizeof(int));
+#endif
+    if (_rxQueue == nullptr) {
         Modbus::Debug::LOG_MSG("Failed to create RX queue for client.");
         stop(); // Cleanup client socket
         return false;
     }
     Modbus::Debug::LOG_MSG("RX queue created for client.");
-    
+
     _isRunning = true;
-    TaskHandle_t taskCreated = xTaskCreateStatic(
-        tcpTask,
-        "ModbusHALtcpCli",
-        TCP_TASK_STACK_SIZE, // Stack size
-        this, // Task parameter
-        tskIDLE_PRIORITY + 1,    // Priority
-        _tcpTaskStack,
-        &_tcpTaskBuf
-    );
+#if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    TaskHandle_t taskCreated = xTaskCreateStatic(tcpTask, "ModbusHALtcpCli",
+                                                 TCP_TASK_STACK_SIZE,  // Stack size
+                                                 this,                 // Task parameter
+                                                 tskIDLE_PRIORITY + 1, // Priority
+                                                 _tcpTaskStack, &_tcpTaskBuf);
 
     if (taskCreated == nullptr) {
         Modbus::Debug::LOG_MSG("Failed to create client TCP task.");
@@ -346,6 +360,9 @@ bool TCP::beginClient(const char* serverIP, uint16_t port) {
         return false;
     }
     Modbus::Debug::LOG_MSG("Client TCP task created and started.");
+#else
+    Modbus::Debug::LOG_MSG("User must call the runTcpTask() function to start the task.");
+#endif
     return true;
 }
 
@@ -518,7 +535,7 @@ void TCP::runTcpTask() {
                         sockets_to_remove[remove_count++] = sock;
                     }
                 }
-            }
+        }
  
             for (size_t i = 0; i < remove_count; ++i) {
                 closeSocket(sockets_to_remove[i]);
@@ -535,7 +552,7 @@ void TCP::runTcpTask() {
                 empty_hits = 0;
             }
  
-        } // Unlock socketsMutex
+    } // Unlock socketsMutex
     } // while (_isRunning)
 }
 
