@@ -17,10 +17,10 @@
 #include "esp_netif.h"
 
 #ifndef EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS // TCP max active sockets (#)
-    #define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 4
+#define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 4
 #endif
 #ifndef EZMODBUS_HAL_TCP_RX_Q_SIZE // TCP RX queue size (# of frames to be signaled)
-    #define EZMODBUS_HAL_TCP_RX_Q_SIZE 16
+#define EZMODBUS_HAL_TCP_RX_Q_SIZE 16
 #endif
 #ifndef EZMODBUS_HAL_TCP_TASK_STACK_SIZE // TCP RX/TX task stack size (bytes)
     #define EZMODBUS_HAL_TCP_TASK_STACK_SIZE 4096
@@ -59,11 +59,14 @@ public:
     TCP(const char* serverIP, uint16_t port);                // Client
     ~TCP();
 
-    // // Storage for FreeRTOS objects
-    // StaticTask_t _tcpTaskBuf;
-    // StackType_t _tcpTaskStack[TCP_TASK_STACK_SIZE];
+// // Storage for FreeRTOS objects
+// StaticTask_t _tcpTaskBuf;
+// StackType_t _tcpTaskStack[TCP_TASK_STACK_SIZE];
+#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+#warning "EZMODBUS_USE_DYNAMIC_MEMORY is not defined"    
     StaticQueue_t _rxQueueBuf;
     uint8_t _rxQueueStorage[RX_QUEUE_SIZE * sizeof(int)];
+#endif
     // Disable copy and assign
     TCP(const TCP&) = delete;
     TCP& operator=(const TCP&) = delete;
@@ -89,13 +92,16 @@ public:
 
     // Give access to RX queue for QueueSet integration (read only)
     QueueHandle_t getRxQueueHandle() const { return _rxQueue; }
-
-private:
-    // Task for handling socket events and data
     static void tcpTask(void* param);
+
+  private:
+    // Task for handling socket events and data
     // TaskHandle_t _tcpTaskHandle; -> defined in public to allow access from tests code
+#if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    TaskHandle_t _tcpTaskHandle;
     StaticTask_t _tcpTaskBuf;
     StackType_t _tcpTaskStack[TCP_TASK_STACK_SIZE];
+#endif
     void runTcpTask(); // Internal method called by the FreeRTOS task
 
     // Socket management
@@ -105,7 +111,6 @@ private:
     void cleanupDeadSockets();  // Clean up dead sockets (EBADF recovery)
 
     // Internal state
-    TaskHandle_t _tcpTaskHandle;
     QueueHandle_t _rxQueue;
     // Fixed-size storage for active sockets (used in server mode)
     int _activeSockets[MAX_ACTIVE_SOCKETS] = {0};
