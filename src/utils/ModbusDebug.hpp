@@ -5,6 +5,15 @@
 
 #pragma once
 
+#if defined(ESP_PLATFORM)
+#include "sdkconfig.h"
+#endif
+
+
+#if CONFIG_EZMODBUS_DEBUG
+#define EZMODBUS_DEBUG 1
+#endif
+
 #include "core/ModbusCore.h"
 #include "core/ModbusFrame.hpp"
 
