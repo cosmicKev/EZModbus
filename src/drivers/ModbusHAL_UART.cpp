@@ -239,6 +239,26 @@ esp_err_t UART::setBaudrate(uint32_t baud_rate) {
     return err;
 }
 
+/* @brief Set the baud rate of the UART driver
+ * @param baud_rate: The baud rate to set
+ * @return ESP_OK on success, ESP_ERR_INVALID_STATE if the driver is not installed
+ */
+esp_err_t UART::setParity(uart_parity_t parity) {
+    _current_hw_config.parity = parity; 
+
+    if (!_is_driver_installed) {
+        Modbus::Debug::LOG_MSGF("Info: Port %d parity set to %d (will be applied at begin())", _uart_num, (int)parity);
+        return ESP_OK;
+    }
+    esp_err_t err = uart_param_config(_uart_num, &_current_hw_config);
+    if (err == ESP_OK) {
+        Modbus::Debug::LOG_MSGF("Info: Port %d parity reconfigured to %d", _uart_num, (int)parity);
+    } else {
+        Modbus::Debug::LOG_MSGF("Error: Port %d failed to reconfigure parity to %d: %s", _uart_num, (int)parity, esp_err_to_name(err));
+    }
+    return err;
+}
+
 /* @brief Wait for the physical transmission to complete
  * @param timeout_ticks: The number of ticks to wait for the transmission to complete
  * @return ESP_OK on success, ESP_ERR_INVALID_STATE if the driver is not installed
@@ -351,6 +371,10 @@ void UART::decode_config_flags(uint32_t flags, uart_word_length_t& data_bits, ua
     data_bits = (uart_word_length_t)(flags & 0xFF);
     parity = (uart_parity_t)((flags >> 8) & 0xFF);
     stop_bits = (uart_stop_bits_t)((flags >> 16) & 0xFF);
+}
+
+uint32_t UART::encode_config_flags(uart_word_length_t data_bits, uart_parity_t parity, uart_stop_bits_t stop_bits) {
+    return (data_bits) | (parity << 8) | (stop_bits << 16);
 }
 
 

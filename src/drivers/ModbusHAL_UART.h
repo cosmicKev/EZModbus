@@ -139,6 +139,8 @@ public:
     // UART config methods
     uint32_t getBaudrate() const { return _baud_rate; }
     esp_err_t setBaudrate(uint32_t baud_rate); 
+    uart_parity_t getParity() const { return _current_hw_config.parity; }
+    esp_err_t setParity(uart_parity_t parity);
     uart_port_t getPort() const { return _uart_num; }
     QueueHandle_t getRegisteredEventQueue() const { return _internal_event_queue_handle; } // Renommé pour clarté
 
@@ -151,6 +153,8 @@ public:
     esp_err_t enablePatternDetection(char pattern_char, uint8_t pattern_length);
     esp_err_t disablePatternDetection();
     esp_err_t flushTxFifo();
+    void decode_config_flags(uint32_t flags, uart_word_length_t& data_bits, uart_parity_t& parity, uart_stop_bits_t& stop_bits);
+    uint32_t encode_config_flags(uart_word_length_t data_bits, uart_parity_t parity, uart_stop_bits_t stop_bits);
 
 private:
 
@@ -172,7 +176,6 @@ private:
 // PRIVATE METHODS
 // ===================================================================================
 
-    static void decode_config_flags(uint32_t flags, uart_word_length_t& data_bits, uart_parity_t& parity, uart_stop_bits_t& stop_bits);
 
     #if defined(ARDUINO_ARCH_ESP32)
     static uint32_t convertArduinoConfig(uint32_t arduino_config); // Convert Arduino config to ESP-IDF config
