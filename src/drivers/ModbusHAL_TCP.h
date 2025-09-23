@@ -17,7 +17,7 @@
 #include "esp_netif.h"
 
 #ifndef EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS // TCP max active sockets (#)
-#define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 4
+#define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 8
 #endif
 #ifndef EZMODBUS_HAL_TCP_RX_Q_SIZE // TCP RX queue size (# of frames to be signaled)
 #define EZMODBUS_HAL_TCP_RX_Q_SIZE 16
