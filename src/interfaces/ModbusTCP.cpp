@@ -262,12 +262,21 @@ void TCP::beginCleanup() {
  * @note Called when the interface is destroyed
  */
 void TCP::killRxTxTask() {
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 1
+    if (_txRequestQueue) 
+    {
+        void* dummy_ptr = this;
+        xQueueSend(_txRequestQueue, &dummy_ptr, 0);
+        vTaskDelay(pdMS_TO_TICKS(RXTX_QUEUE_CHECK_TIMEOUT_MS + 50)); // Wait a bit more than task queue check timeout
+    }
+    #else
     if (_rxTxTaskHandle && _txRequestQueue) {
         // Send a dummy signal to wake up the task so it can check _isInitialized
         void* dummy_ptr = this;
         xQueueSend(_txRequestQueue, &dummy_ptr, 0);
         vTaskDelay(pdMS_TO_TICKS(RXTX_QUEUE_CHECK_TIMEOUT_MS + 50)); // Wait a bit more than task queue check timeout
     }
+    #endif
 }
 
 /* @brief Process a raw frame received from the HAL

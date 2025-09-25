@@ -58,9 +58,10 @@ TCP::TCP(const char* serverIP, uint16_t port) : TCP() {
 }
 
 TCP::~TCP() {
-#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
-    vQueueDelete(_rxQueue);
-#endif
+    if (_rxQueue) {
+        vQueueDelete(_rxQueue);
+        _rxQueue = nullptr;
+    }
     stop();
 }
 
@@ -373,6 +374,7 @@ void TCP::tcpTask(void* param) {
         self->runTcpTask();
     }
     Modbus::Debug::LOG_MSGF("tcpTask exiting for %s.", self->_isServer ? "server" : "client");
+    // otherwise we cant delete the external task
     vTaskDelete(nullptr);
 }
 
