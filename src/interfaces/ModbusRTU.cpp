@@ -301,6 +301,16 @@ void RTU::beginCleanup() {
  * @note Called when the interface is destroyed
  */
 void RTU::killRxTxTask() {
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 1
+    if (_rxEventQueue) {
+        uart_event_t dummy_evt = {
+            .type = UART_EVENT_MAX,
+            .size = 0,
+            .timeout_flag = false }; 
+        xQueueSend(_rxEventQueue, &dummy_evt, 0); 
+        vTaskDelay(pdMS_TO_TICKS(RXTX_QUEUE_CHECK_TIMEOUT_MS + 50)); // Wait a bit more than RxTxTask queue check timeout
+    }
+    #else
     if (_rxTxTaskHandle && _rxEventQueue) {
         // Send a dummy event to wake up the rxTxTask
         uart_event_t dummy_evt = {
@@ -310,6 +320,7 @@ void RTU::killRxTxTask() {
         xQueueSend(_rxEventQueue, &dummy_evt, 0); 
         vTaskDelay(pdMS_TO_TICKS(RXTX_QUEUE_CHECK_TIMEOUT_MS + 50)); // Wait a bit more than RxTxTask queue check timeout
     }
+    #endif
 }
 
 /* @brief Process a received Modbus frame
