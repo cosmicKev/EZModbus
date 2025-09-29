@@ -289,7 +289,7 @@ bool TCP::beginServer(uint16_t port, uint32_t ip) {
         return false; // Error logged in setupServerSocket
     }
 
-#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+#if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _rxQueue = xQueueCreateStatic(RX_QUEUE_SIZE, sizeof(int), _rxQueueStorage, &_rxQueueBuf);
 #else
     _rxQueue = xQueueCreate(RX_QUEUE_SIZE, sizeof(int));
@@ -334,7 +334,7 @@ bool TCP::beginClient(const char* serverIP, uint16_t port) {
         // Continue anyway, auto-reconnect will handle it
     }
 
-#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+#if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _rxQueue = xQueueCreateStatic(RX_QUEUE_SIZE, sizeof(int), _rxQueueStorage, &_rxQueueBuf);
 #else
     _rxQueue = xQueueCreate(RX_QUEUE_SIZE, sizeof(int));
@@ -517,6 +517,12 @@ void TCP::runTcpTask() {
             uint8_t dummy;
             for (size_t idx = 0; idx < check_count; ++idx) {
                 int sock = sockets_to_check[idx];
+                if(sock < 0)
+                {
+                    printf("Socket %d is invalid.\n", sock);
+                    Modbus::Debug::LOG_MSGF("Socket %d is invalid.", sock);
+                    continue;
+                }
                 if (!FD_ISSET(sock, &readfds)) continue;
  
                 ssize_t peek = ::recv(sock, &dummy, 1, MSG_PEEK);

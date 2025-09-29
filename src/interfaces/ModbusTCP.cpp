@@ -87,6 +87,7 @@ TCP::Result TCP::begin() {
         return Error(ERR_INIT_FAILED, "failed to create TX queue");
     }
 
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     // Create Txn control queue (size 1)
     #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _txnControlQueue = xQueueCreateStatic(1, sizeof(void*), _txnControlQueueStorage, &_txnControlQueueBuffer);
