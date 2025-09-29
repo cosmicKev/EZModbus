@@ -118,14 +118,16 @@ private:
     QueueHandle_t _rxEventQueue = nullptr;
     // _txRequestQueue: just a dummy signaling queue so that we can use xQueueSet 
     // to wait for both RX and TX without wasting CPU
-    #ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
     StaticQueue_t _txRequestQueueBuffer;
     alignas(4) uint8_t _txRequestQueueStorage[1 * sizeof(void*)];
     #endif
     QueueHandle_t _txRequestQueue = nullptr;
     // _txnControlQueue: only rxTxTask terminates transaction through this queue
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
     StaticQueue_t _txnControlQueueBuffer;
     alignas(4) uint8_t _txnControlQueueStorage[1 * sizeof(void*)];
+    #endif
     QueueHandle_t _txnControlQueue = nullptr;
     // _eventQueueSet: Combines TX event queue + HAL event queue + Txn control queue
     QueueSetHandle_t _eventQueueSet = nullptr;

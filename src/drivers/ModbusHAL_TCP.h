@@ -17,7 +17,7 @@
 #include "esp_netif.h"
 
 #ifndef EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS // TCP max active sockets (#)
-#define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 8
+#define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 16
 #endif
 #ifndef EZMODBUS_HAL_TCP_RX_Q_SIZE // TCP RX queue size (# of frames to be signaled)
 #define EZMODBUS_HAL_TCP_RX_Q_SIZE 16
@@ -62,7 +62,7 @@ public:
 // // Storage for FreeRTOS objects
 // StaticTask_t _tcpTaskBuf;
 // StackType_t _tcpTaskStack[TCP_TASK_STACK_SIZE];
-#ifndef CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
+#if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
 #warning "EZMODBUS_USE_DYNAMIC_MEMORY is not defined"    
     StaticQueue_t _rxQueueBuf;
     uint8_t _rxQueueStorage[RX_QUEUE_SIZE * sizeof(int)];
