@@ -8,13 +8,13 @@
 #include "core/ModbusCore.h"
 #include "utils/ModbusDebug.hpp"
 
-#include <sys/socket.h>
-#include <netdb.h>
+#include "esp_netif.h"
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include "esp_netif.h"
+#include <sys/socket.h>
 
 #ifndef EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS // TCP max active sockets (#)
 #define EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS 16
@@ -23,63 +23,71 @@
 #define EZMODBUS_HAL_TCP_RX_Q_SIZE 16
 #endif
 #ifndef EZMODBUS_HAL_TCP_TASK_STACK_SIZE // TCP RX/TX task stack size (bytes)
-    #define EZMODBUS_HAL_TCP_TASK_STACK_SIZE 4096
+#define EZMODBUS_HAL_TCP_TASK_STACK_SIZE 4096
 #endif
 
+namespace ModbusHAL
+{
 
-namespace ModbusHAL {
-
-class TCP {
-public:
-    enum CfgMode { UNINIT, SERVER, CLIENT };
+class TCP
+{
+  public:
+    enum CfgMode
+    {
+        UNINIT,
+        SERVER,
+        CLIENT
+    };
 
     static constexpr size_t MAX_ACTIVE_SOCKETS = (size_t)EZMODBUS_HAL_TCP_MAX_ACTIVE_SOCKETS;
-    static constexpr size_t RX_QUEUE_SIZE = (size_t)EZMODBUS_HAL_TCP_RX_Q_SIZE; // Number of Modbus frames the RX queue can hold
+    static constexpr size_t RX_QUEUE_SIZE =
+        (size_t)EZMODBUS_HAL_TCP_RX_Q_SIZE; // Number of Modbus frames the RX queue can hold
     static constexpr size_t TCP_TASK_STACK_SIZE = (size_t)EZMODBUS_HAL_TCP_TASK_STACK_SIZE;
-    static constexpr size_t MAX_MODBUS_FRAME_SIZE = 260;  // Modbus TCP max frame size (MBAP + PDU)
-    static constexpr uint32_t SELECT_TIMEOUT_MS = 1000; // select() timeout in milliseconds (1s = low CPU usage)
-    static constexpr uint32_t CONNECT_TIMEOUT_SEC = 5;  // Connect timeout in seconds (5s)
+    static constexpr size_t MAX_MODBUS_FRAME_SIZE = 260; // Modbus TCP max frame size (MBAP + PDU)
+    static constexpr uint32_t SELECT_TIMEOUT_MS = 1000;  // select() timeout in milliseconds (1s = low CPU usage)
+    static constexpr uint32_t CONNECT_TIMEOUT_SEC = 5;   // Connect timeout in seconds (5s)
 
     // Recovery configuration constants
-    static constexpr int MAX_SELECT_ERRORS = 5;               // Max select() errors before long sleep
+    static constexpr int MAX_SELECT_ERRORS = 5;                // Max select() errors before long sleep
     static constexpr uint32_t SELECT_RECOVERY_SLEEP_MS = 2000; // Sleep after MAX_SELECT_ERRORS (2s)
     static constexpr uint32_t SELECT_BACKOFF_BASE_MS = 1000;   // Progressive backoff base (1s)
     static constexpr int MAX_EMPTY_HITS = 3;                   // Max empty rounds before anti-spin pause
-    static constexpr uint32_t ANTI_SPIN_DELAY_MS = 10;        // Anti-spin EAGAIN delay (10ms)
+    static constexpr uint32_t ANTI_SPIN_DELAY_MS = 10;         // Anti-spin EAGAIN delay (10ms)
 
     // Structure for messages exchanged between HAL and Modbus layer
-    struct TCPMsg {
+    struct TCPMsg
+    {
         uint8_t payload[MAX_MODBUS_FRAME_SIZE];
         size_t len;
-        int socketNum;  // Socket descriptor: source (RX) or destination (TX)
+        int socketNum; // Socket descriptor: source (RX) or destination (TX)
     };
 
     TCP();
-    explicit TCP(uint16_t serverPort);                       // Server
-    TCP(const char* serverIP, uint16_t port);                // Client
+    explicit TCP(uint16_t serverPort);        // Server
+    TCP(const char *serverIP, uint16_t port); // Client
     ~TCP();
 
 // // Storage for FreeRTOS objects
 // StaticTask_t _tcpTaskBuf;
 // StackType_t _tcpTaskStack[TCP_TASK_STACK_SIZE];
 #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
-#warning "EZMODBUS_USE_DYNAMIC_MEMORY is not defined"    
+#warning "EZMODBUS_USE_DYNAMIC_MEMORY is not defined"
     StaticQueue_t _rxQueueBuf;
     uint8_t _rxQueueStorage[RX_QUEUE_SIZE * sizeof(int)];
 #endif
     // Disable copy and assign
-    TCP(const TCP&) = delete;
-    TCP& operator=(const TCP&) = delete;
+    TCP(const TCP &) = delete;
+    TCP &operator=(const TCP &) = delete;
 
     // Setup methods
     bool begin();
     bool beginServer(uint16_t port, uint32_t ip = INADDR_ANY);
-    bool beginClient(const char* serverIP, uint16_t port);
+    bool beginClient(const char *serverIP, uint16_t port);
     void stop();
 
     // Main API
-    bool sendMsg(const uint8_t* payload, const size_t len, const int destSocket = -1, int* actualSocket = nullptr);
-    size_t readSocketData(int socketNum, uint8_t* dst, size_t maxLen);
+    bool sendMsg(const uint8_t *payload, const size_t len, const int destSocket = -1, int *actualSocket = nullptr);
+    size_t readSocketData(int socketNum, uint8_t *dst, size_t maxLen);
 
     // Monitoring
     size_t getActiveSocketCount();
@@ -88,11 +96,17 @@ public:
     bool isReady();
 
     // Get HAL configuration mode (server/client/uninit)
-    CfgMode getMode() const { return _cfgMode; }
+    CfgMode getMode() const
+    {
+        return _cfgMode;
+    }
 
     // Give access to RX queue for QueueSet integration (read only)
-    QueueHandle_t getRxQueueHandle() const { return _rxQueue; }
-    static void tcpTask(void* param);
+    QueueHandle_t getRxQueueHandle() const
+    {
+        return _rxQueue;
+    }
+    static void tcpTask(void *param);
 
   private:
     // Task for handling socket events and data
@@ -106,22 +120,22 @@ public:
 
     // Socket management
     bool setupServerSocket(uint16_t port, uint32_t ip);
-    bool setupClientSocket(const char* serverIP, uint16_t port);
+    bool setupClientSocket(const char *serverIP, uint16_t port);
     void closeSocket(int sock);
-    void cleanupDeadSockets();  // Clean up dead sockets (EBADF recovery)
+    void cleanupDeadSockets(); // Clean up dead sockets (EBADF recovery)
 
     // Internal state
     QueueHandle_t _rxQueue;
     // Fixed-size storage for active sockets (used in server mode)
     int _activeSockets[MAX_ACTIVE_SOCKETS] = {0};
     size_t _activeSocketCount = 0; // Current number of active sockets
-    int _listenSocket;              // Server listen socket
-    int _clientSocket;              // Client mode connected socket
-    bool _isServer;                 // True if running in server mode
-    volatile bool _isRunning;       // Task control flag
-    
+    int _listenSocket;             // Server listen socket
+    int _clientSocket;             // Client mode connected socket
+    bool _isServer;                // True if running in server mode
+    volatile bool _isRunning;      // Task control flag
+
     // Mutex for protecting shared resources like _activeSockets
-    Mutex _socketsMutex; 
+    Mutex _socketsMutex;
 
     // Config stored if constructor parameters are provided
     CfgMode _cfgMode = CfgMode::UNINIT;
