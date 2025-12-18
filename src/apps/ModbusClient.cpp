@@ -617,62 +617,21 @@ Client::Result Client::sendRequest(const Modbus::Frame &request,
       // (TX failure or timeout -> detected by the timer or TX task)
       return Error(*tracker);
     }
-<<<<<<< HEAD
-=======
 
-    _pendingRequest.setResult(NODATA, false); // Update result tracker immediately
+      // Check if we got the expected bit (otherwise timeout)
+      if ((bits & SYNC_COMPLETION_BIT) == 0) {
+        _pendingRequest.setResult(ERR_TIMEOUT, true);
+        return Error(ERR_TIMEOUT, "sync wait timeout");
+      }
 
-    // Send the frame on the interface using callback
-    auto sendRes = _interface.sendFrame(request, staticHandleTxResult, this);
-    if (sendRes != ModbusInterface::IInterface::SUCCESS) {
-        _pendingRequest.setResult(ERR_TX_FAILED, true);
-        return Error(ERR_TX_FAILED);
-    }
-
-    // ---------- Synchronous mode (userTracker == nullptr) ----------
-    if (!userTracker) {
-        // Create an event group for this synchronous transaction
-        #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY
-        EventGroupHandle_t syncEvtGrp = xEventGroupCreate();
-        #else
-        EventGroupHandle_t syncEvtGrp = xEventGroupCreateStatic(&_syncEventGroupBuf);
-        #endif
-        if (!syncEvtGrp) {
-            _pendingRequest.setResult(ERR_TIMEOUT, true);
-            return Error(ERR_BUSY, "cannot create event group");
-        }
-
-        // Register the event group inside the pending request so that the worker can signal completion
-        _pendingRequest.setSyncEventGroup(syncEvtGrp);
-
-        // Wait for completion or timeout (response, TX error, or timeout timer)
-        EventBits_t bits = xEventGroupWaitBits(
-            syncEvtGrp,
-            SYNC_COMPLETION_BIT, // bit 0 reserved for completion
-            pdTRUE,               // clear on exit
-            pdFALSE,              // wait for any bit
-            pdMS_TO_TICKS(_requestTimeoutMs + 100) // little margin
-        );
-
-        // We're done with the event group
-        vEventGroupDelete(syncEvtGrp);
-        syncEvtGrp = nullptr;
-        _pendingRequest.setSyncEventGroup(syncEvtGrp);
-
-        // Check if we got the expected bit (otherwise timeout)
-        if ((bits & SYNC_COMPLETION_BIT) == 0) {
-            _pendingRequest.setResult(ERR_TIMEOUT, true);
-            return Error(ERR_TIMEOUT, "sync wait timeout");
-        }
-
-        // The localResult variable now contains the outcome
-        bool ok = (*tracker == SUCCESS);
-        if (!ok) {
-            // The result tracker indicates the outcome of the request
-            // (TX failure or timeout -> detected by the timer or TX task)
-            return Error(*tracker);
-        }
-        return Success();
+      // The localResult variable now contains the outcome
+      bool ok = (*tracker == SUCCESS);
+      if (!ok) {
+        // The result tracker indicates the outcome of the request
+        // (TX failure or timeout -> detected by the timer or TX task)
+        return Error(*tracker);
+      }
+      return Success();
     }
 
     // ---------- Asynchronous mode (userTracker != nullptr) ----------
