@@ -622,11 +622,6 @@ Client::Result Client::sendRequest(const Modbus::Frame &request,
 
   // ---------- Asynchronous mode (userTracker != nullptr) ----------
   return Success();
-  return Success();
-}
-
-// ---------- Asynchronous mode (userTracker != nullptr) ----------
-return Success();
 }
 
 /* @brief Send a request (asynchronous with callback)
