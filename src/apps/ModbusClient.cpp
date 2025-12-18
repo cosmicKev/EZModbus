@@ -617,30 +617,16 @@ Client::Result Client::sendRequest(const Modbus::Frame &request,
       // (TX failure or timeout -> detected by the timer or TX task)
       return Error(*tracker);
     }
-
-      // Check if we got the expected bit (otherwise timeout)
-      if ((bits & SYNC_COMPLETION_BIT) == 0) {
-        _pendingRequest.setResult(ERR_TIMEOUT, true);
-        return Error(ERR_TIMEOUT, "sync wait timeout");
-      }
-
-      // The localResult variable now contains the outcome
-      bool ok = (*tracker == SUCCESS);
-      if (!ok) {
-        // The result tracker indicates the outcome of the request
-        // (TX failure or timeout -> detected by the timer or TX task)
-        return Error(*tracker);
-      }
-      return Success();
-    }
-
-    // ---------- Asynchronous mode (userTracker != nullptr) ----------
->>>>>>> 5e589ef (Requires due to dynamic allocation. Pointer needs to be set to null.)
     return Success();
   }
 
   // ---------- Asynchronous mode (userTracker != nullptr) ----------
   return Success();
+  return Success();
+}
+
+// ---------- Asynchronous mode (userTracker != nullptr) ----------
+return Success();
 }
 
 /* @brief Send a request (asynchronous with callback)
