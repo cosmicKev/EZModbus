@@ -602,7 +602,6 @@ Client::Result Client::sendRequest(const Modbus::Frame &request,
     // We're done with the event group
     vEventGroupDelete(syncEvtGrp);
     syncEvtGrp = nullptr;
-    _pendingRequest.setSyncEventGroup(syncEvtGrp);
 
     // Check if we got the expected bit (otherwise timeout)
     if ((bits & SYNC_COMPLETION_BIT) == 0) {
