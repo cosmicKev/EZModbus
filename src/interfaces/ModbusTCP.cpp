@@ -89,6 +89,7 @@ TCP::Result TCP::begin() {
 
     #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     // Create Txn control queue (size 1)
+    #if CONFIG_EZMODBUS_USE_DYNAMIC_MEMORY == 0
     _txnControlQueue = xQueueCreateStatic(1, sizeof(void*), _txnControlQueueStorage, &_txnControlQueueBuffer);
     #else
     _txnControlQueue = xQueueCreate(1, sizeof(void*));
@@ -269,6 +270,14 @@ void TCP::beginCleanup() {
         vQueueDelete(_txnControlQueue);
         _txnControlQueue = nullptr;
     }
+    
+    // User is responsible for deleting the task
+    #if CONFIG_EZMODBUS_USE_EXTERNAL_TASK == 0
+    if (_rxTxTaskHandle) {
+        vTaskDelete(_rxTxTaskHandle);
+        _rxTxTaskHandle = nullptr;
+    }
+    #endif
     // Do not delete HAL RX queue as it belongs to _tcpHAL
 }
 
@@ -580,6 +589,8 @@ void TCP::endTransaction() {
     if (_currentTransaction.active) {
         Modbus::Debug::LOG_MSGF("Transaction ended on socket: %d with TID: %d", _currentTransaction.socketNum, _currentTransaction.tid);
         _currentTransaction.clear();
+    } else {
+        Modbus::Debug::LOG_MSG("endTransaction called but not in transaction.");
     }
 }
 
